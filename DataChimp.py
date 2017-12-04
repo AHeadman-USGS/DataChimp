@@ -53,7 +53,7 @@ def runoffPull(station, start_date, end_date):
 TList = ['ANEW1','SAMW1', 'KOMK', 'CDAW1','NCSW1', 'FBFW1', 
          'KMFW1', 'LEFW1', 'DIFW1','D7538', 'MMSW1']
 PList = ['MUKW1']
-RList = ['12446150']
+RList = ['12446150', '12446400']
 
 # datetime object provides previous two years of data
 year = datetime.now().year
