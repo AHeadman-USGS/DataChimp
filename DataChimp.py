@@ -2,7 +2,9 @@ from MesoPy import Meso
 from ulmo import usgs
 from datetime import datetime, timedelta
 
-# ulmo is throwing depreciation warnings like its going out of style.
+# ulmo is throwing useless depreciation warnings like its going out of style.
+# I got annoyed.  Ulmo has too much console flavor text to begin with.
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -13,6 +15,15 @@ m = Meso(token='81a655ec55cf450a87caa21486692770')
 def daterange(start_date, end_date):
     for n in range(int ((end_date - start_date).days)):
         yield start_date + timedelta(n)
+
+def metaPull(station):
+    meta = m.metadata(stid=station)
+    x=meta['STATION'][0]
+    name = x['NAME']
+    elev = x['ELEV_DEM']
+    periodStart = x['PERIOD_OF_RECORD']['start']
+    periodEnd = x['PERIOD_OF_RECORD']['end']
+    return name, elev, periodStart, periodEnd
 
 def tminPull(station, start_date):
     end_d = start_date + timedelta(hours=32)
@@ -40,13 +51,16 @@ def precipPull(station, start_date):
 
 def runoffPull(station, start_date, end_date):
     if start_date == end_date:
-        return -999
+        return -999.0
     else:
         runoff = usgs.nwis.get_site_data(site_code=station,service='dv',
                                               parameter_code='00060', start=start_date, end=start_date)
         x=runoff['00060:00003']['values'][0]
         runOffDV = float(x['value'])
-        return runOffDV
+        if runOffDV < 0:
+            return -999.0
+        else:
+            return runOffDV
 
 # Current working lists for weather stations.
 
@@ -55,14 +69,25 @@ TList = ['ANEW1','SAMW1', 'KOMK', 'CDAW1','NCSW1', 'FBFW1',
 PList = ['MUKW1']
 RList = ['12446150', '12446400']
 
-# datetime object provides previous two years of data
+#for station in PList:
+#    a,b,c,d = metaPull(station)
+#    print (a, b, c, d, sep=", ")
+file = open("SalmonCreek.dat","w")
+file.write("tmax "+str(len(TList))+'\n')
+file.write("tmin "+str(len(TList))+'\n')
+file.write("precip "+str(len(TList)+len(PList))+'\n')
+file.write("runoff "+str(len(RList))+'\n') 
+file.write("########################################"+'\n')   
+
+## datetime object provides previous X years/days/months of data
+    
 year = datetime.now().year
 month = datetime.now().month
 day = datetime.now().day
 hour = datetime.now().hour
 minute = datetime.now().minute
 
-start_date = datetime(year, month, day-3, hour, minute)
+start_date = datetime(year, month, day-2, hour, minute)
 end_date = datetime(year, month, day, hour, minute)
 for single_date in daterange(start_date, end_date):
     TminList=[]
@@ -85,5 +110,7 @@ for single_date in daterange(start_date, end_date):
     for station in RList:
         runoffval = runoffPull(station, single_date, end_date)
         ROList.append(runoffval)
-    csvline = single_date.year, single_date.month, single_date.day, 0,0,0,*TminList, *TmaxList, *PrecipList, *ROList
-    print(csvline)
+    file.write(str(single_date.year)+" "+str(single_date.month)+" "+str(single_date.day)+" "
+               +str(0)+" "+str(0)+" "+str(0)+" "+" ".join(map(str,TmaxList))+" "+" ".join(map(str,TminList))+
+               " "+ " ".join(map(str,PrecipList))+" "+" ".join(map(str,ROList))+'\n')
+file.close()
