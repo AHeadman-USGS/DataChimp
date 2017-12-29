@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 
 # ulmo is throwing useless depreciation warnings like its going out of style.
 # I got annoyed.  Ulmo has too much console flavor text to begin with.
+# New version will phase out Ulmo in favor of my own urllib recipe.
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -20,7 +22,10 @@ def readLast(fileName):
     fileName = open(fileName, 'r')
     lineList = fileName.readlines()
     date = lineList[-1]
-    dateobj = datetime.strptime(date[:10], '%Y %m %d')
+    if int(date[5:7]) < 10:
+        dateobj = datetime.strptime(date[:9], '%Y %m %d')
+    else:
+        dateobj = datetime.strptime(date[:10], '%Y %m %d')
     return dateobj
 
 def metaPullMeso(station):
@@ -105,7 +110,7 @@ if os.path.isfile(file) == True:
     if start_date == end_date:
         print("No update needed")
     else:
-        file = open("SalmonCreekTest.dat", 'a')
+        file = open("SalmonCreekActual.dat", 'a')
         for single_date in daterange(start_date, end_date):
             TminList=[]
             TmaxList=[]
@@ -130,7 +135,7 @@ if os.path.isfile(file) == True:
             file.write(str(single_date.year)+" "+str(single_date.month)+" "+str(single_date.day)+" "
                        +str(0)+" "+str(0)+" "+str(0)+" "+" ".join(map(str,TmaxList))+" "+" ".join(map(str,TminList))+
                        " "+ " ".join(map(str,PrecipList))+" "+" ".join(map(str,ROList))+'\n')
-            file.close()
+        file.close()
 else:
     ## if no .dat file is found this begins the process of creating one 
     
