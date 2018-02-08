@@ -1,16 +1,21 @@
-import os
+import os, isodate
 from MesoPy import Meso
-from ulmo import usgs
+import lxml.etree as et
+from urllib.request import urlopen
 from datetime import datetime, timedelta
+
+#from ulmo import usgs
+
 
 # ulmo is throwing useless depreciation warnings like its going out of style.
 # I got annoyed.  Ulmo has too much console flavor text to begin with.
 # New version will phase out Ulmo in favor of my own urllib recipe.
 
-import warnings
-warnings.filterwarnings("ignore")
+#import warnings
+#warnings.filterwarnings("ignore")
 
 # mesowest api Token, use this until it breaks.
+
 m = Meso(token='81a655ec55cf450a87caa21486692770')
 
 # functions
@@ -72,28 +77,49 @@ def precipPull(station, start_date):
     except:
         return -999.0
     
-def runoffPull(station, start_date, end_date):
+#def runoffPull(station, start_date, end_date):
+#    try:
+#        if start_date == end_date:
+#            return -999.0
+#        else:
+#            runoff = usgs.nwis.get_site_data(site_code=station,service='dv',
+#                                                  parameter_code='00060', start=start_date, end=start_date)
+#            x=runoff['00060:00003']['values'][0]
+#            runOffDV = float(x['value'])
+#            if runOffDV < 0:
+#                return -999.0
+#            else:
+#                return runOffDV
+#    except:
+#        return -999.0
+
+def runOffPullv2(station, start_date, end_date):
     try:
         if start_date == end_date:
             return -999.0
         else:
-            runoff = usgs.nwis.get_site_data(site_code=station,service='dv',
-                                                  parameter_code='00060', start=start_date, end=start_date)
-            x=runoff['00060:00003']['values'][0]
-            runOffDV = float(x['value'])
-            if runOffDV < 0:
-                return -999.0
-            else:
-                return runOffDV
+            datetime_formatter = isodate.datetime_isoformat
+            start = datetime_formatter(start_date)
+            start = start[0:10]
+            dvXml = urlopen('https://waterservices.usgs.gov/nwis/dv/?format=waterml&site='+station+'&parameterCd=00060&startDT='+start+'&endDT='+start)
+            tree = et.parse(dvXml)
+            root = tree.getroot()
+            values = root.findall('.//{http://www.cuahsi.org/waterML/1.1/}values')
+            for value in values:
+                returned = value.find('{http://www.cuahsi.org/waterML/1.1/}value').text
+                if float(returned) < 0:
+                    return -999.0
+                else:
+                    return returned
     except:
         return -999.0
-
+    
 # Current working lists for weather stations.
 
 TList = ['ANEW1','SAMW1', 'KOMK', 'CDAW1', 'FBFW1','KMFW1', 'LEFW1']
 PList = ['MUKW1']
 RList = ['12446150', '12446400']
-file = "SalmonCreekActual.dat"
+file = "SalmonCreek.dat"
 
 if os.path.isfile(file) == True:
     # if the .dat file exists this updates the file with the information
@@ -110,7 +136,7 @@ if os.path.isfile(file) == True:
     if start_date == end_date:
         print("No update needed")
     else:
-        file = open("SalmonCreekActual.dat", 'a')
+        file = open("SalmonCreek.dat", 'a')
         for single_date in daterange(start_date, end_date):
             TminList=[]
             TmaxList=[]
@@ -130,7 +156,7 @@ if os.path.isfile(file) == True:
                 precip = precipPull (station, start_d)
                 PrecipList.append(precip)
             for station in RList:
-                runoffval = runoffPull(station, single_date, end_date)
+                runoffval = runOffPullv2(station, single_date, end_date)
                 ROList.append(runoffval)
             file.write(str(single_date.year)+" "+str(single_date.month)+" "+str(single_date.day)+" "
                        +str(0)+" "+str(0)+" "+str(0)+" "+" ".join(map(str,TmaxList))+" "+" ".join(map(str,TminList))+
@@ -139,7 +165,7 @@ if os.path.isfile(file) == True:
 else:
     ## if no .dat file is found this begins the process of creating one 
     
-    file = open("SalmonCreekActual.dat","w")
+    file = open("SalmonCreek.dat","w")
     file.write("// Station metadata:"+'\n')
     file.write("// ID Name Type Latitude Longitude Elevation"+'\n')
     
@@ -177,6 +203,7 @@ else:
         TmaxList=[]
         PrecipList=[]
         ROList=[]
+        
         # mesowest uses UTC, this adjusts for PST to UTC
         start_d = single_date + timedelta(hours=8)
         end_d = single_date + timedelta(hours=32)
@@ -191,9 +218,10 @@ else:
             precip = precipPull (station, start_d)
             PrecipList.append(precip)
         for station in RList:
-            runoffval = runoffPull(station, single_date, end_date)
+            runoffval = runOffPullv2(station, single_date, end_date)
             ROList.append(runoffval)
         file.write(str(single_date.year)+" "+str(single_date.month)+" "+str(single_date.day)+" "
                    +str(0)+" "+str(0)+" "+str(0)+" "+" ".join(map(str,TmaxList))+" "+" ".join(map(str,TminList))+
                    " "+ " ".join(map(str,PrecipList))+" "+" ".join(map(str,ROList))+'\n')
     file.close()
+file.close()
